@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f18;
+      --surface:   #141720;
+      --surface2:  #1c2030;
+      --border:    #272d45;
+      --text:      #e2e4f0;
+      --muted:     #6b7299;
+      --red:       #f87171;
+      --red-bg:    #1f0f0f;
+      --red-border:#3d1515;
+      --amber:     #fbbf24;
+      --amber-bg:  #1f1600;
+      --amber-border:#3d2d00;
+      --blue:      #60a5fa;
+      --blue-bg:   #0a1220;
+      --blue-border:#153060;
+      --green:     #4ade80;
+      --green-bg:  #071510;
+      --green-border:#0e3020;
+      --purple:    #a78bfa;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .app { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+
+    /* ── Header ── */
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -1px; }
+    .header h1 span { color: var(--blue); }
+    .header p { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+
+    /* ── Input card ── */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .input-card label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      line-height: 1.6;
+      padding: 14px 16px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea:focus { border-color: var(--blue); }
+    textarea::placeholder { color: var(--muted); }
+
+    .input-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .example-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .example-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    .analyze-btn {
+      background: var(--blue);
+      color: #0a1020;
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 10px 28px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .analyze-btn:hover { opacity: 0.88; }
+    .analyze-btn:active { transform: scale(0.97); }
+    .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Loading ── */
+    .loading {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      align-items: center;
+      gap: 14px;
+    }
+    .loading.show { display: flex; }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.875rem; color: var(--muted); }
+    .loading-text strong { color: var(--blue); }
+
+    /* ── Results ── */
+    #results { display: none; }
+    #results.show { display: block; }
+
+    /* ── Health Score ── */
+    .score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .score-circle {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 3px solid var(--border);
+      font-weight: 800;
+    }
+    .score-circle .score-num { font-size: 1.8rem; line-height: 1; }
+    .score-circle .score-max { font-size: 0.7rem; color: var(--muted); }
+    .score-circle.excellent { border-color: var(--green); color: var(--green); }
+    .score-circle.good      { border-color: var(--blue);  color: var(--blue);  }
+    .score-circle.fair      { border-color: var(--amber); color: var(--amber); }
+    .score-circle.poor      { border-color: var(--red);   color: var(--red);   }
+
+    .score-details h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .score-details p  { font-size: 0.875rem; color: var(--muted); max-width: 560px; }
+
+    /* ── Section cards ── */
+    .section {
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+      border: 1px solid;
+    }
+    .section.conflicts  { background: var(--red-bg);   border-color: var(--red-border); }
+    .section.missing    { background: var(--amber-bg); border-color: var(--amber-border); }
+    .section.clusters   { background: var(--blue-bg);  border-color: var(--blue-border); }
+    .section.recs       { background: var(--green-bg); border-color: var(--green-border); }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .section-icon { font-size: 1.1rem; }
+    .section-title { font-size: 0.875rem; font-weight: 700; flex: 1; }
+    .conflicts .section-title  { color: var(--red);   }
+    .missing   .section-title  { color: var(--amber); }
+    .clusters  .section-title  { color: var(--blue);  }
+    .recs      .section-title  { color: var(--green); }
+
+    .section-count {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .conflicts .section-count  { background: var(--red-border);   color: var(--red);   }
+    .missing   .section-count  { background: var(--amber-border); color: var(--amber); }
+    .clusters  .section-count  { background: var(--blue-border);  color: var(--blue);  }
+    .recs      .section-count  { background: var(--green-border); color: var(--green); }
+
+    .chevron { color: var(--muted); font-size: 0.75rem; transition: transform 0.2s; }
+    .section.open .chevron { transform: rotate(180deg); }
+
+    .section-body { display: none; border-top: 1px solid; padding: 0; }
+    .conflicts  .section-body { border-color: var(--red-border); }
+    .missing    .section-body { border-color: var(--amber-border); }
+    .clusters   .section-body { border-color: var(--blue-border); }
+    .recs       .section-body { border-color: var(--green-border); }
+    .section.open .section-body { display: block; }
+
+    /* ── Issue rows ── */
+    .issue {
+      padding: 14px 20px;
+      border-bottom: 1px solid;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+    }
+    .conflicts .issue { border-color: var(--red-border); }
+    .missing   .issue { border-color: var(--amber-border); }
+    .clusters  .issue { border-color: var(--blue-border); }
+    .recs      .issue { border-color: var(--green-border); }
+    .issue:last-child { border-bottom: none; }
+
+    .issue-bullet {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+    .conflicts .issue-bullet  { background: var(--red);   }
+    .missing   .issue-bullet  { background: var(--amber); }
+    .clusters  .issue-bullet  { background: var(--blue);  }
+    .recs      .issue-bullet  { background: var(--green); }
+
+    .issue-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+    .issue-desc  { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+    .issue-suggestion {
+      margin-top: 6px;
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    .conflicts .issue-suggestion { background: var(--red-border); color: var(--red); }
+    .missing   .issue-suggestion { background: var(--amber-border); color: var(--amber); }
+
+    /* ── Cluster cards ── */
+    .cluster {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--blue-border);
+    }
+    .cluster:last-child { border-bottom: none; }
+    .cluster-name { font-size: 0.875rem; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+    .cluster-theme { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
+    .cluster-detail {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 0.78rem;
+    }
+    .cluster-detail-item { background: var(--blue-border); border-radius: 6px; padding: 8px 10px; }
+    .cluster-detail-label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .cluster-detail-value { color: var(--text); }
+
+    /* ── Rec rows ── */
+    .rec {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--green-border);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .rec:last-child { border-bottom: none; }
+    .rec-num {
+      width: 20px; height: 20px;
+      background: var(--green-border);
+      color: var(--green);
+      border-radius: 50%;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+    .rec-text { font-size: 0.875rem; color: var(--text); }
+
+    /* ── Empty state ── */
+    .empty {
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    /* ── Error ── */
+    .error-msg {
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      color: var(--red);
+      font-size: 0.875rem;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    @media (max-width: 560px) {
+      .cluster-detail { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>Calendar <span>Analyzer</span></h1>
+    <p>Paste your schedule — AI finds conflicts, missing info, and scheduling improvements.</p>
+  </div>
+
+  <!-- Input -->
+  <div class="input-card">
+    <label>Your Schedule</label>
+    <textarea id="scheduleInput" placeholder="Paste your schedule in any format. For example:
+
+Monday
+  9:00 - 9:30   Team standup (recurring)
+  10:00 - 11:00  Q2 planning with Sarah, Mike, and Tom
+  11:00 - 12:00  1:1 with Sarah
+  2:00 - 3:00   Client call - Acme Corp
+
+Tuesday
+  9:00 - 10:00  Engineering sync (Zoom)
+  9:30 - 10:30  Product review
+  11:00 - 12:00  1:1 with Tom
+  3:00 - 4:00   Acme Corp follow-up call"></textarea>
+    <div class="input-footer">
+      <button class="example-btn" id="exampleBtn">Load example schedule</button>
+      <button class="analyze-btn" id="analyzeBtn">
+        <span>&#9670;</span> Analyze Calendar
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">
+      <strong>Analyzing your calendar...</strong> Claude is reading your schedule and finding issues.
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Health Score -->
+    <div class="score-card" id="scoreCard">
+      <div class="score-circle" id="scoreCircle">
+        <span class="score-num" id="scoreNum">—</span>
+        <span class="score-max">/100</span>
+      </div>
+      <div class="score-details">
+        <h2 id="scoreLabel">Calendar Health</h2>
+        <p id="scoreSummary"></p>
+      </div>
+    </div>
+
+    <!-- Conflicts -->
+    <div class="section conflicts" id="conflictsSection">
+      <div class="section-header" onclick="toggleSection('conflictsSection')">
+        <span class="section-icon">⚠</span>
+        <span class="section-title">Time Conflicts &amp; Overlaps</span>
+        <span class="section-count" id="conflictsCount">0</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="section-body" id="conflictsBody"></div>
+    </div>
+
+    <!-- Missing Info -->
+    <div class="section missing" id="missingSection">
+      <div class="section-header" onclick="toggleSection('missingSection')">
+        <span class="section-icon">○</span>
+        <span class="section-title">Missing Info (links, rooms, agenda)</span>
+        <span class="section-count" id="missingCount">0</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="section-body" id="missingBody"></div>
+    </div>
+
+    <!-- Topic Clusters -->
+    <div class="section clusters" id="clustersSection">
+      <div class="section-header" onclick="toggleSection('clustersSection')">
+        <span class="section-icon">◈</span>
+        <span class="section-title">Topic Clusters — Consolidation Opportunities</span>
+        <span class="section-count" id="clustersCount">0</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="section-body" id="clustersBody"></div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="section recs" id="recsSection">
+      <div class="section-header" onclick="toggleSection('recsSection')">
+        <span class="section-icon">✓</span>
+        <span class="section-title">Recommendations</span>
+        <span class="section-count" id="recsCount">0</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="section-body" id="recsBody"></div>
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /app -->
+
+<script>
+const EXAMPLE_SCHEDULE = `Monday, March 24
+  9:00am - 9:30am   All-hands standup (recurring)
+  9:15am - 10:00am  1:1 with Jamie (link TBD)
+  10:00am - 11:00am Q2 roadmap planning - Sarah, Mike, Tom, Lisa
+  11:00am - 12:00pm Engineering architecture review (in-person)
+  2:00pm - 3:00pm   Client call: Acme Corp (phone)
+  3:00pm - 4:00pm   Acme Corp contract review
+  4:00pm - 5:00pm   Q2 roadmap follow-up
+
+Tuesday, March 25
+  9:00am - 10:00am  Engineering sprint planning (Zoom: https://zoom.us/j/123456)
+  9:30am - 10:30am  Product design review (conference room needed)
+  11:00am - 11:30am 1:1 with Tom
+  12:00pm - 1:00pm  Team lunch (optional)
+  2:00pm - 3:00pm   Acme Corp onboarding prep
+  3:30pm - 4:30am   Board prep meeting (conference room 3B)
+
+Wednesday, March 26
+  10:00am - 11:00am Q2 roadmap stakeholder review
+  1:00pm - 2:00pm   Engineering hiring debrief (Zoom)
+  2:00pm - 3:00pm   Engineering retro (Zoom)
+  4:00pm - 5:00pm   1:1 with Sarah`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function showSection(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function setCount(id, n) {
+  document.getElementById(id).textContent = n;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  RENDER RESULTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderAnalysis(data) {
+  // Health score
+  const score = data.healthScore ?? 0;
+  const label = data.healthLabel ?? 'Unknown';
+  const scoreEl = document.getElementById('scoreCircle');
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreLabel').textContent = label + ' Calendar';
+  document.getElementById('scoreSummary').textContent = data.summary ?? '';
+
+  const cls = label === 'Excellent' ? 'excellent'
+            : label === 'Good'      ? 'good'
+            : label === 'Fair'      ? 'fair'
+            : 'poor';
+  scoreEl.className = 'score-circle ' + cls;
+
+  // Conflicts
+  const conflicts = data.conflicts ?? [];
+  setCount('conflictsCount', conflicts.length);
+  const events = data.events ?? [];
+  const eventMap = Object.fromEntries(events.map(e => [e.id, e]));
+
+  if (conflicts.length === 0) {
+    document.getElementById('conflictsBody').innerHTML =
+      '<div class="empty">No conflicts detected ✓</div>';
+  } else {
+    document.getElementById('conflictsBody').innerHTML = conflicts.map(c => {
+      const e1 = eventMap[c.event1Id];
+      const e2 = eventMap[c.event2Id];
+      const names = [e1?.title, e2?.title].filter(Boolean).join(' &amp; ');
+      const badge = c.severity === 'hard'
+        ? '<span style="color:var(--red);font-size:0.7rem;font-weight:700;margin-left:6px">HARD CONFLICT</span>'
+        : '<span style="color:var(--amber);font-size:0.7rem;font-weight:700;margin-left:6px">SOFT</span>';
+      return `<div class="issue">
+        <div class="issue-bullet"></div>
+        <div>
+          <div class="issue-title">${escHtml(names)}${badge}</div>
+          <div class="issue-desc">${escHtml(c.description)}</div>
+          ${c.impact ? `<div class="issue-suggestion">${escHtml(c.impact)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    showSection('conflictsSection');
+  }
+
+  // Missing info
+  const missing = data.missingInfo ?? [];
+  setCount('missingCount', missing.length);
+
+  if (missing.length === 0) {
+    document.getElementById('missingBody').innerHTML =
+      '<div class="empty">All meetings have necessary info ✓</div>';
+  } else {
+    document.getElementById('missingBody').innerHTML = missing.map(m => {
+      const ev = eventMap[m.eventId];
+      const title = ev?.title ?? ('Event #' + m.eventId);
+      const typeLabel = {
+        no_video_link: 'Missing video link',
+        no_room:       'No room booked',
+        no_dial_in:    'No dial-in info',
+        vague_title:   'Vague title',
+        no_agenda:     'No agenda',
+      }[m.issueType] ?? m.issueType;
+      return `<div class="issue">
+        <div class="issue-bullet"></div>
+        <div>
+          <div class="issue-title">${escHtml(title)} — ${escHtml(typeLabel)}</div>
+          <div class="issue-desc">${escHtml(m.description)}</div>
+          ${m.suggestion ? `<div class="issue-suggestion">&#9656; ${escHtml(m.suggestion)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    showSection('missingSection');
+  }
+
+  // Topic clusters
+  const clusters = data.topicClusters ?? [];
+  setCount('clustersCount', clusters.length);
+
+  if (clusters.length === 0) {
+    document.getElementById('clustersBody').innerHTML =
+      '<div class="empty">No clustering opportunities found</div>';
+  } else {
+    document.getElementById('clustersBody').innerHTML = clusters.map(cl => {
+      const eventTitles = (cl.eventIds ?? [])
+        .map(id => eventMap[id]?.title).filter(Boolean)
+        .map(t => `<span style="background:var(--blue-border);color:var(--blue);padding:1px 7px;border-radius:4px;font-size:0.72rem;margin:2px 2px 0 0;display:inline-block">${escHtml(t)}</span>`)
+        .join('');
+      return `<div class="cluster">
+        <div class="cluster-name">${escHtml(cl.clusterName)}</div>
+        <div class="cluster-theme">${escHtml(cl.theme)}</div>
+        ${eventTitles ? `<div style="margin-bottom:10px">${eventTitles}</div>` : ''}
+        <div class="cluster-detail">
+          <div class="cluster-detail-item">
+            <div class="cluster-detail-label">Currently</div>
+            <div class="cluster-detail-value">${escHtml(cl.currentPattern ?? '—')}</div>
+          </div>
+          <div class="cluster-detail-item">
+            <div class="cluster-detail-label">Suggested</div>
+            <div class="cluster-detail-value">${escHtml(cl.suggestedConsolidation ?? '—')}</div>
+          </div>
+        </div>
+        ${cl.benefit ? `<div style="margin-top:8px;font-size:0.78rem;color:var(--blue)">${escHtml(cl.benefit)}</div>` : ''}
+      </div>`;
+    }).join('');
+    showSection('clustersSection');
+  }
+
+  // Recommendations
+  const recs = data.recommendations ?? [];
+  setCount('recsCount', recs.length);
+
+  if (recs.length === 0) {
+    document.getElementById('recsBody').innerHTML =
+      '<div class="empty">No additional recommendations</div>';
+  } else {
+    document.getElementById('recsBody').innerHTML = recs.map((r, i) =>
+      `<div class="rec">
+        <div class="rec-num">${i + 1}</div>
+        <div class="rec-text">${escHtml(r)}</div>
+      </div>`
+    ).join('');
+    showSection('recsSection');
+  }
+
+  document.getElementById('results').classList.add('show');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ANALYZE
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function analyze() {
+  const schedule = document.getElementById('scheduleInput').value.trim();
+  if (!schedule) {
+    document.getElementById('scheduleInput').focus();
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  const loading = document.getElementById('loading');
+  const results = document.getElementById('results');
+  const errorEl = document.getElementById('errorMsg');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>&#9670;</span> Analyzing...';
+  loading.classList.add('show');
+  results.classList.remove('show');
+  errorEl.classList.remove('show');
+
+  try {
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let msg;
+        try { msg = JSON.parse(raw); } catch { continue; }
+
+        if (msg.type === 'error') {
+          throw new Error(msg.message);
+        }
+        if (msg.type === 'done') {
+          loading.classList.remove('show');
+          renderAnalysis(msg.analysis);
+        }
+      }
+    }
+  } catch (err) {
+    loading.classList.remove('show');
+    errorEl.textContent = 'Error: ' + err.message;
+    errorEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>&#9670;</span> Analyze Calendar';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────────────────
+
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('exampleBtn').addEventListener('click', () => {
+  document.getElementById('scheduleInput').value = EXAMPLE_SCHEDULE;
+});
+document.getElementById('scheduleInput').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') analyze();
+});
+</script>
+</body>
+</html>
